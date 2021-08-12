@@ -1,7 +1,8 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Windows.Forms;
 using System.IO;
+using System.Diagnostics;
 using Amicitia.ResourceWrappers;
 using AmicitiaLibrary.Graphics;
 using OpenTK;
@@ -14,15 +15,20 @@ using System.Numerics;
 using Amicitia.Utilities;
 using OpenTK.Graphics;
 using OpenTK.Graphics.OpenGL;
+using System.Reflection;
 
 namespace Amicitia
 {
-    internal partial class MainForm : Form
+    public partial class MainForm : Form
     {
         //private static Rectangle _lastMainTreeViewSize;
         private static MainForm mInstance;
         private ModelViewer.ModelViewer mViewer;
-
+        public static IntPtr panelHandle;
+        public static int formWidth;
+        public static int formHeight;
+        public static string filename;
+        public static string oldpath;
         public static MainForm Instance
         {
             get => mInstance;
@@ -47,6 +53,7 @@ namespace Amicitia
 
         public MainForm()
         {
+
             InitializeComponent();
             InitializeMainForm();
 #if DEBUG
@@ -54,7 +61,9 @@ namespace Amicitia
             if (t != null)
                 Console.WriteLine("You are running with the Mono VM");
             else
-                NativeMethods.AllocConsole();
+                //NativeMethods.AllocConsole();
+
+            panelHandle = panel_GMOView.Handle;
 #endif
         }
 
@@ -76,7 +85,7 @@ namespace Amicitia
                 OpenFile(filePaths[0]);
             }
         }
-
+        
         private void MainTreeViewAfterLabelEditEventHandler(object sender, NodeLabelEditEventArgs e)
         {
             mainTreeView.LabelEdit = false;
@@ -99,7 +108,7 @@ namespace Amicitia
             var resNode = mainTreeView.SelectedNode;
             var resWrap = resNode as IResourceWrapper;
 
-            if ( resWrap == null )
+            if (resWrap == null)
             {
                 return;
             }
@@ -124,62 +133,62 @@ namespace Amicitia
                     {
                         mViewer.DeleteScene();
 
-                        if ( resWrap.FileType == SupportedFileType.RmdScene )
+                        if (resWrap.FileType == SupportedFileType.RmdScene)
                         {
                             var scene = resWrap.Resource as RmdScene;
 
                             // For field models
                             if (!scene.HasTextureDictionary && resNode.Parent != null)
                             {
-                                foreach ( TreeNode node in resNode.Parent.Nodes )
+                                foreach (TreeNode node in resNode.Parent.Nodes)
                                 {
                                     if (node.Text.EndsWith("rws"))
                                     {
-                                        var parentResWrap = ( IResourceWrapper )node;
+                                        var parentResWrap = (IResourceWrapper)node;
                                         var parentScene = parentResWrap.Resource as RmdScene;
-                                        if ( parentScene.HasTextureDictionary )
-                                            mViewer.LoadTextures( parentScene.TextureDictionary );
+                                        if (parentScene.HasTextureDictionary)
+                                            mViewer.LoadTextures(parentScene.TextureDictionary);
                                     }
                                 }
                             }
 
-                            mViewer.LoadScene( resWrap.Resource as RmdScene );
+                            mViewer.LoadScene(resWrap.Resource as RmdScene);
                         }
-                        else if ( resWrap.FileType == SupportedFileType.RwClumpNode )
+                        else if (resWrap.FileType == SupportedFileType.RwClumpNode)
                         {
-                            var model = ( RwClumpNode )resWrap.Resource;
-                            var scene = model.FindParent( RwNodeId.RmdSceneNode ) as RmdScene;
-                            if ( scene != null && scene.HasTextureDictionary )
-                                mViewer.LoadTextures( scene.TextureDictionary );
+                            var model = (RwClumpNode)resWrap.Resource;
+                            var scene = model.FindParent(RwNodeId.RmdSceneNode) as RmdScene;
+                            if (scene != null && scene.HasTextureDictionary)
+                                mViewer.LoadTextures(scene.TextureDictionary);
 
-                            mViewer.LoadModel( model );
+                            mViewer.LoadModel(model);
                         }
-                        else if ( resWrap.FileType == SupportedFileType.RwGeometryNode )
+                        else if (resWrap.FileType == SupportedFileType.RwGeometryNode)
                         {
-                            var geometry = ( RwGeometryNode )resWrap.Resource;
-                            var scene = geometry.FindParent( RwNodeId.RmdSceneNode ) as RmdScene;
-                            if ( scene != null && scene.TextureDictionary != null )
-                                mViewer.LoadTextures( scene.TextureDictionary );
+                            var geometry = (RwGeometryNode)resWrap.Resource;
+                            var scene = geometry.FindParent(RwNodeId.RmdSceneNode) as RmdScene;
+                            if (scene != null && scene.TextureDictionary != null)
+                                mViewer.LoadTextures(scene.TextureDictionary);
 
-                            mViewer.LoadGeometry( geometry, Matrix4x4.Identity );
+                            mViewer.LoadGeometry(geometry, Matrix4x4.Identity);
                         }
-                        else if ( resWrap.FileType == SupportedFileType.RwAtomicNode )
+                        else if (resWrap.FileType == SupportedFileType.RwAtomicNode)
                         {
-                            var atomicNode = ( RwAtomicNode )resWrap.Resource;
-                            var clump = atomicNode.FindParent( RwNodeId.RwClumpNode ) as RwClumpNode;
+                            var atomicNode = (RwAtomicNode)resWrap.Resource;
+                            var clump = atomicNode.FindParent(RwNodeId.RwClumpNode) as RwClumpNode;
                             var geometry = clump.GeometryList[atomicNode.GeometryIndex];
                             var frame = clump.FrameList[atomicNode.FrameIndex];
 
-                            var scene = atomicNode.FindParent( RwNodeId.RmdSceneNode ) as RmdScene;
-                            if ( scene != null && scene.TextureDictionary != null )
-                                mViewer.LoadTextures( scene.TextureDictionary );
+                            var scene = atomicNode.FindParent(RwNodeId.RmdSceneNode) as RmdScene;
+                            if (scene != null && scene.TextureDictionary != null)
+                                mViewer.LoadTextures(scene.TextureDictionary);
 
-                            mViewer.LoadGeometry( geometry, frame.WorldTransform );
+                            mViewer.LoadGeometry(geometry, frame.WorldTransform);
                         }
                     }
-                    catch ( Exception ex )
+                    catch (Exception ex)
                     {
-                        Console.WriteLine( ex.Message );
+                        Console.WriteLine(ex.Message);
                         //throw;
                     }
 
@@ -193,6 +202,29 @@ namespace Amicitia
                 }
             }
 
+            if (resWrap.FileType == SupportedFileType.Resource && resWrap.Text == "MODEL_DATA" || resWrap.FileType == SupportedFileType.GMO || resWrap.FileType == SupportedFileType.Resource && resWrap.Text.ToLower().Contains(".gmo"))
+            {
+                var path = "";
+                if (resWrap.Text.ToLower().Contains(".gmo"))
+                    path = resWrap.Text;
+                else
+                    path = resWrap.Text + ".gmo";
+                path = Path.Combine(System.IO.Path.GetTempPath(), path);
+                resWrap.Export(path, SupportedFileType.Resource);
+
+                oldpath = path;
+                Debug.WriteLine(resWrap.Text);
+                ModelViewer2.Update(path);
+                panel_GMOView.Visible = true;
+            }
+            else
+            {
+                if (File.Exists(oldpath))
+                    File.Delete(oldpath);
+                ModelViewer2.CloseProcess();
+                panel_GMOView.Visible = false;
+            }
+                
             // Check if the resource is a texture
             if (resWrap.Resource is ITextureFile)
             {
@@ -222,7 +254,7 @@ namespace Amicitia
                 {
                     return;
                 }
-
+                filename = openFileDlg.FileName;
                 OpenFile( openFileDlg.FileName);
             }
         }
@@ -401,6 +433,8 @@ namespace Amicitia
         {
             if (mViewer != null)
                 mViewer.DisposeViewer();
+
+
         }
 
         private void OptionsToolStripMenuItem_Click(object sender, EventArgs e)
@@ -435,6 +469,26 @@ namespace Amicitia
             options.Controls.Add(more);
             options.ShowDialog(this);
         }
+
+        
+
+
+        private void MainForm_SizeChanged(object sender, EventArgs e)
+        {
+            if (panel_GMOView.Visible == true)
+                GmoView_Refresh.Visible = true;
+        }
+
+        private void GmoView_Refresh_Click(object sender, EventArgs e)
+        {
+            ModelViewer2.Update(oldpath);
+            GmoView_Refresh.Visible = false;
+        }
+
+        private void MainForm_Load(object sender, EventArgs e)
+        {
+            this.Text = "Amicitia";
+        }
     }
 
     internal static class NativeMethods
@@ -454,3 +508,4 @@ namespace Amicitia
         private static extern short GetAsyncKeyState(Keys vKey);
     }
 }
+
